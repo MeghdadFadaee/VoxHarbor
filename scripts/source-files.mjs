@@ -2,8 +2,8 @@ import { readdir, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export const projectRoot = fileURLToPath(new URL('../', import.meta.url));
-const roots = ['api', 'src', 'public', 'scripts', 'tests', 'docs', 'native/src', 'native/vendor'];
-const top = ['.gitignore', '.vercelignore', '.env.example', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'SECURITY.md', 'CONTRIBUTING.md', 'README.md', 'IMPLEMENTATION_PLAN.md', 'package.json', 'package-lock.json', 'vercel.json', 'native/Cargo.toml', 'native/Cargo.lock', 'native/README.md'];
+const roots = ['.github/workflows', 'api', 'src', 'public', 'scripts', 'tests', 'docs', 'native/src', 'native/vendor'];
+const top = ['.gitignore', '.vercelignore', '.env.example', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'SECURITY.md', 'CONTRIBUTING.md', 'README.md', 'AGENTS.md', 'IMPLEMENTATION_PLAN.md', 'package.json', 'package-lock.json', 'vercel.json', 'native/Cargo.toml', 'native/Cargo.lock', 'native/README.md'];
 export function privatePath(path) {
   return /(^|\/)(\.git|\.local|\.idea|\.vscode|node_modules|target|coverage|evidence)(\/|$)/.test(path) ||
     /^(native\/bin|docs\/verification)(\/|$)/.test(path) ||

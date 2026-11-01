@@ -1,0 +1,125 @@
+name: VoxHarbor CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (${{ matrix.platform }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ matrix.platform }}-${{ matrix.toolchain }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            toolchain: production
+            node: '22.x'
+            rust: '1.96.0'
+          - platform: macos
+            runner: macos-latest
+            toolchain: production
+            node: '22.x'
+            rust: '1.96.0'
+          - platform: linux
+            runner: ubuntu-latest
+            toolchain: latest
+            node: 'lts/*'
+            rust: stable
+          - platform: macos
+            runner: macos-latest
+            toolchain: latest
+            node: 'lts/*'
+            rust: stable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          check-latest: true
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Select Rust toolchain
+        env:
+          CI_RUST_TOOLCHAIN: ${{ matrix.rust }}
+        run: |
+          rustup toolchain install "$CI_RUST_TOOLCHAIN" --profile minimal --no-self-update
+          rustup default "$CI_RUST_TOOLCHAIN"
+      - name: Build native adapter and browser codec
+        run: npm run native:build
+      - name: Check JavaScript syntax
+        run: npm run check
+      - name: Run tests (including native identity tests)
+        run: npm test
+      - name: Audit public source
+        run: npm run publication:check
+      - name: Verify deployment packaging
+        run: npm run deployment:package
+
+  deploy:
+    name: Deploy production
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    concurrency:
+      group: voxharbor-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 'lts/*'
+          check-latest: true
+          cache: npm
+      - name: Skip superseded commits
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$head_sha" = "$GITHUB_SHA" ]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer main commit exists; this deployment is skipped.'
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install locked dependencies
+        if: steps.current.outputs.deploy == 'true'
+        run: npm ci
+      - name: Upload audited source and wait for Vercel
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+          VERCEL_CLI_USE_NATIVE_BINARY: '0'
+        run: node scripts/deploy-ci.mjs
+      - name: Verify live release and authentication gates
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          node scripts/verify-release.mjs "$PRODUCTION_URL"
+          node scripts/verify-public-deployment.mjs "$PRODUCTION_URL"

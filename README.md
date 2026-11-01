@@ -32,6 +32,8 @@ npm run deployment:package
 
 Upload only the printed clean folder. It excludes environment files, identities, local evidence, dependencies, Git metadata and build outputs. Native code builds for the deployment platform. A successful local build is not proof that another deployment/account works.
 
+GitHub Actions tests pull requests on Linux and macOS and deploys passing changes from `main` to Vercel. See [CI/CD setup](docs/CI_CD.md) for the production environment configuration.
+
 ## Development and verification
 
 ```sh
