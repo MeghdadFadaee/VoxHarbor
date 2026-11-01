@@ -1,0 +1,7 @@
+{
+  "package": "libopus-wasm",
+  "version": "0.3.0",
+  "generatedSha256": "0041fc800ccd26f56b27eaeb1834c8c6854e5167d48cd628a4f98ec5b590c6f1",
+  "licenseSource": "https://github.com/xiph/opus/blob/v1.6.1/COPYING",
+  "note": "The unchanged upstream-generated WASM includes published upstream compiler/assertion build paths; no owner configuration is embedded."
+}

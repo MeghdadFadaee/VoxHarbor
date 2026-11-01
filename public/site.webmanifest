@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "VoxHarbor",
+  "short_name": "VoxHarbor",
+  "description": "A self-hosted TeamSpeak 3 web client.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#171818",
+  "theme_color": "#171818",
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

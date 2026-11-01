@@ -1,0 +1,85 @@
+--- a/tsproto/src/lib.rs
++++ b/tsproto/src/lib.rs
+@@ -53,7 +53,9 @@
+ 
+ /// The maximum number of packets which are stored, if they are received
+ /// out-of-order.
+-const MAX_QUEUE_LEN: u16 = 200;
++// A high-latency initial channel burst can span more than 200 packet IDs
++// before a missing command is retransmitted. Keep a bounded reorder window.
++const MAX_QUEUE_LEN: u16 = 2048;
+ 
+ /// The maximum decompressed size of a packet.
+ #[allow(clippy::unreadable_literal)]
+--- a/tsproto/src/packet_codec.rs
++++ b/tsproto/src/packet_codec.rs
+@@ -343,7 +343,13 @@
+ 			if (!next_gen && id >= cur_next && id < limit)
+ 				|| (next_gen && (id >= cur_next || id < limit))
+ 			{
+-				r_queue.push(packet_data);
++				// Retransmissions must not grow the queue or survive as stale duplicates.
++				if !r_queue.iter().any(|p| InHeader::new(dir, p).packet_id() == id) {
++					if r_queue.len() >= usize::from(MAX_QUEUE_LEN) {
++						return Err(Error::MaxLengthExceeded("command queue"));
++					}
++					r_queue.push(packet_data);
++				}
+ 				Ok(vec![])
+ 			} else {
+ 				Err(Error::MaxLengthExceeded("command queue"))
+@@ -459,3 +465,54 @@
+ 		Ok(packets)
+ 	}
+ }
++
++#[cfg(test)]
++mod reorder_tests {
++	use super::*;
++
++	fn packet(id: u16, kind: PacketType) -> Vec<u8> {
++		OutPacket::new([0; 8], id, None, Flags::empty(), kind).into_vec()
++	}
++
++	async fn connection() -> Connection {
++		let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
++		Connection::new(true, "127.0.0.1:9987".parse().unwrap(), Box::new(socket))
++	}
++
++	#[tokio::test]
++	async fn burst_waits_for_missing_command_and_drains_in_order() {
++		let mut con = connection().await;
++		for id in (1..MAX_QUEUE_LEN).rev() {
++			assert!(PacketCodec::handle_command_packet(&mut con, packet(id, PacketType::Command)).unwrap().is_empty());
++		}
++		for _ in 0..100 {
++			PacketCodec::handle_command_packet(&mut con, packet(300, PacketType::Command)).unwrap();
++		}
++		assert_eq!(con.codec.receive_queue[0].len(), usize::from(MAX_QUEUE_LEN - 1));
++		assert!(matches!(PacketCodec::handle_command_packet(&mut con, packet(MAX_QUEUE_LEN, PacketType::Command)), Err(Error::MaxLengthExceeded("command queue"))));
++		let packets = PacketCodec::handle_command_packet(&mut con, packet(0, PacketType::Command)).unwrap();
++		assert_eq!(packets.len(), usize::from(MAX_QUEUE_LEN));
++		for (id, bytes) in packets.iter().enumerate() {
++			assert_eq!(InHeader::new(Direction::S2C, bytes).packet_id(), id as u16);
++		}
++		assert!(con.codec.receive_queue[0].is_empty());
++	}
++
++	#[tokio::test]
++	async fn reorder_window_wraps_and_command_priorities_remain_independent() {
++		let mut con = connection().await;
++		let start = u16::MAX - 100;
++		con.codec.incoming_p_ids[PacketType::Command as usize].packet_id = start;
++		for offset in (1..350u16).rev() {
++			PacketCodec::handle_command_packet(&mut con, packet(start.wrapping_add(offset), PacketType::Command)).unwrap();
++		}
++		PacketCodec::handle_command_packet(&mut con, packet(1, PacketType::CommandLow)).unwrap();
++		let packets = PacketCodec::handle_command_packet(&mut con, packet(start, PacketType::Command)).unwrap();
++		assert_eq!(packets.len(), 350);
++		for (offset, bytes) in packets.iter().enumerate() {
++			assert_eq!(InHeader::new(Direction::S2C, bytes).packet_id(), start.wrapping_add(offset as u16));
++		}
++		assert_eq!(con.codec.receive_queue[1].len(), 1);
++		assert_eq!(PacketCodec::handle_command_packet(&mut con, packet(0, PacketType::CommandLow)).unwrap().len(), 2);
++	}
++}

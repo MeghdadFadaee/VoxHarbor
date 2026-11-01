@@ -1,0 +1,24 @@
+[
+  {
+    "project": "ReSpeak/tsclientlib",
+    "revision": "ee3bc6f45a7137db7793ba5593a321df400d53e5",
+    "archiveSha256": "65c12cc22758985436242470974d497343df6077c946c8b874ca165f6044b092",
+    "method": "GitHub source archive; no Git checkout or metadata",
+    "localPatches": [
+      {
+        "path": "raw-audio.patch",
+        "purpose": "Expose encoded audio stream variants without the native codec module; preserve existing transport encryption and permission handling"
+      },
+      {
+        "path": "bounded-reordering.patch",
+        "purpose": "Bounded 2048-packet command reordering with duplicate suppression for high-latency synchronization bursts; encryption and authentication unchanged; includes ordered-drain and sequence-wrap tests"
+      }
+    ]
+  },
+  {
+    "project": "ReSpeak/tsdeclarations",
+    "revision": "83cb8a94b65021bb8ec4beb339e5bfbdd93df60f",
+    "archiveSha256": "3dcfb83b8474a851723a30e8baa2a22d8f44de9c130386c6a4501516edfded66",
+    "method": "GitHub source archive; no Git checkout or metadata"
+  }
+]

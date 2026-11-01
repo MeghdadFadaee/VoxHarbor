@@ -1,0 +1,78 @@
+--- a/tsclientlib/src/lib.rs
++++ b/tsclientlib/src/lib.rs
+@@ -38,7 +38,7 @@
+ use tsproto::connection::StreamItem as ProtoStreamItem;
+ use tsproto::resend::ResenderState;
+ use tsproto_packets::commands::{CommandItem, CommandParser};
+-#[cfg(feature = "audio")]
++#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ use tsproto_packets::packets::InAudioBuf;
+ use tsproto_packets::packets::{InCommandBuf, OutCommand, OutPacket, PacketType};
+ 
+@@ -214,7 +214,7 @@
+ 	///
+ 	/// Audio packets can be handled by the [`AudioHandler`](audio::AudioHandler), which builds a
+ 	/// queue per client and handles packet loss and jitter.
+-	#[cfg(feature = "audio")]
++	#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ 	Audio(InAudioBuf),
+ 	/// The needed level.
+ 	IdentityLevelIncreasing(u8),
+@@ -1092,7 +1092,7 @@
+ 	/// If the current channel (and server) allow unencrypted voice packets.
+ 	///
+ 	/// For whisper packets, only the server setting is checked.
+-	#[cfg(feature = "audio")]
++	#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ 	fn intern_can_receive_unencrypted_audio(book: &data::Connection, whisper: bool) -> bool {
+ 		match book.server.codec_encryption_mode {
+ 			CodecEncryptionMode::ForcedOn => false,
+@@ -1215,7 +1215,7 @@
+ 						ProtoStreamItem::Error(error) => {
+ 							warn!(%error, "Connection got a non-fatal error");
+ 						}
+-						#[cfg(feature = "audio")]
++						#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ 						ProtoStreamItem::Audio(audio) => {
+ 							if !Self::intern_can_receive_audio(book, &self.options) {
+ 								info!("Received audio packet while output is muted, ignoring");
+--- a/tsclientlib/Cargo.toml
++++ b/tsclientlib/Cargo.toml
+@@ -23,6 +23,8 @@
+ # Enable the unstable api
+ unstable = []
+ audio = ["audiopus"]
++# Forward encoded packets without linking a native audio codec.
++raw-audio = []
+ # Enable default reqwest features.
+ # Use default-features=false on tsclientlib to configure reqwest differently.
+ default-tls = ["reqwest/charset", "reqwest/default-tls", "reqwest/http2"]
+--- a/tsclientlib/src/sync.rs
++++ b/tsclientlib/src/sync.rs
+@@ -11,7 +11,7 @@
+ use tokio::sync::{mpsc, oneshot};
+ use tracing::{error, info};
+ use ts_bookkeeping::ChannelId;
+-#[cfg(feature = "audio")]
++#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ use tsproto_packets::packets::InAudioBuf;
+ #[cfg(feature = "unstable")]
+ use tsproto_packets::packets::OutCommand;
+@@ -62,7 +62,7 @@
+ 	///
+ 	/// Audio packets can be handled by the [`AudioHandler`](crate::audio::AudioHandler), which
+ 	/// builds a queue per client and handles packet loss and jitter.
+-	#[cfg(feature = "audio")]
++	#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ 	Audio(InAudioBuf),
+ 	/// The needed level.
+ 	IdentityLevelIncreasing(u8),
+@@ -234,7 +234,7 @@
+ 							SyncStreamItem::BookEvents(i)
+ 						}
+ 						StreamItem::MessageEvent(i) => SyncStreamItem::MessageEvent(i),
+-						#[cfg(feature = "audio")]
++						#[cfg(any(feature = "audio", feature = "raw-audio"))]
+ 						StreamItem::Audio(i) => SyncStreamItem::Audio(i),
+ 						StreamItem::IdentityLevelIncreasing(i) => {
+ 							SyncStreamItem::IdentityLevelIncreasing(i)

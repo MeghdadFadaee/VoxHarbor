@@ -1,0 +1,19 @@
+# Private configuration and runtime data
+.env*
+!.env.example
+.local/
+.vercel/
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+*.log
+coverage/
+evidence/
+docs/verification/
+# Reproducible dependencies and builds
+**/node_modules/
+**/target/
+native/bin/
+# Upstream editor/CI metadata is not needed to build vendored libraries
+native/vendor/**/.*
