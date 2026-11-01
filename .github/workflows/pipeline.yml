@@ -58,6 +58,20 @@ jobs:
         run: |
           rustup toolchain install "$CI_RUST_TOOLCHAIN" --profile minimal --no-self-update
           rustup default "$CI_RUST_TOOLCHAIN"
+      - name: Identify Rust compiler for cache
+        id: rust
+        shell: bash
+        run: echo "version=$(rustc --version | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+      - name: Cache Rust dependencies and build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/src
+            ~/.cargo/git/db
+            native/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.version }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml') }}
       - name: Build native adapter and browser codec
         run: npm run native:build
       - name: Check JavaScript syntax
